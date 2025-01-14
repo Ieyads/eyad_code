@@ -1,0 +1,87 @@
+#orientaation 
+ros2 run imu_filter_madgwick imu_filter_madgwick_node --ros-args --param use_mag:=false
+
+#rviz frame
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 base_link imu_link
+**************************************
+#controller 
+to find id:
+ls -l /dev/input/by-id/
+
+/dev/input/event 
+
+run:
+ros2 launch teleop_twist_joy teleop-launch.py joy_config:='xbox'
+
+turtle: 
+ros2 run turtlesim turtlesim_node --ros-args --remap /turtle1/cmd_vel:=/cmd_vel
+
+to get data:
+ros2 topic echo /joy
+
+*************************************************
+source install/setup.bash
+
+++++++++++++++++++++
+teleop_twist_joy_node:
+  ros__parameters:
+    axis_linear:  # Mapping joystick axes for linear velocity
+      x: 1  # Left thumb stick vertical
+      y: 4  # Right thumb stick vertical 
+      z: 3  # Right thumb stick horizontal
+    scale_linear:
+      x: 0.7
+      y: 0.7  # Scale for y-direction
+      z: 0.7  # Scale for z-direction
+    scale_linear_turbo:
+      x: 1.5
+      y: 1.5
+      z: 1.5
+
+    axis_angular:  # Mapping joystick axes for angular velocity
+      yaw: 0  # Left thumb stick horizontal
+    scale_angular:
+      yaw: 0.4
+
+    enable_button: 2  # Left trigger button
+    enable_turbo_button: 5  # Right trigger button
+********************************************
+import os
+
+from ament_index_python.packages import get_package_share_directory
+
+import launch
+import launch_ros.actions
+
+
+def generate_launch_description():
+    joy_config = launch.substitutions.LaunchConfiguration('joy_config')
+    joy_dev = launch.substitutions.LaunchConfiguration('joy_dev')
+    publish_stamped_twist = launch.substitutions.LaunchConfiguration('publish_stamped_twist')
+    config_filepath = launch.substitutions.LaunchConfiguration('config_filepath')
+
+    return launch.LaunchDescription([
+        launch.actions.DeclareLaunchArgument('joy_vel', default_value='cmd_vel'),
+        launch.actions.DeclareLaunchArgument('joy_config', default_value='xbox'),
+        launch.actions.DeclareLaunchArgument('joy_dev', default_value='0'),
+        launch.actions.DeclareLaunchArgument('publish_stamped_twist', default_value='false'),
+        launch.actions.DeclareLaunchArgument('config_filepath', default_value=[
+            launch.substitutions.TextSubstitution(text=os.path.join(
+                get_package_share_directory('teleop_twist_joy'), 'config', '')),
+            joy_config, launch.substitutions.TextSubstitution(text='.config.yaml')]),
+
+        launch_ros.actions.Node(
+            package='joy', executable='joy_node', name='joy_node',
+            parameters=[{
+                'device_id': joy_dev,
+                'deadzone': 0.3,
+                'autorepeat_rate': 20.0,
+            }]),
+        launch_ros.actions.Node(
+            package='teleop_twist_joy', executable='teleop_node',
+            name='teleop_twist_joy_node',
+            parameters=[config_filepath, {'publish_stamped_twist': publish_stamped_twist}],
+            remappings={('/cmd_vel', launch.substitutions.LaunchConfiguration('joy_vel'))},
+            ),
+    ])
+
