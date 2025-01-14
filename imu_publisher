@@ -1,0 +1,47 @@
+import rclpy
+import serial
+from rclpy.node import Node
+from sensor_msgs.msg import Imu
+
+
+
+class IMU_Publisher(Node):
+    def __init__(self):
+        super().__init__('imu_publisher')
+        self.timer = self.create_timer(0.02, self.send_IMU_data_cmd)
+        self.IMU_pub_ = self.create_publisher(Imu, 'imu/data_raw', 10)
+        self.get_logger().info('imu_publisher node has been started')
+        
+        
+
+    def serial_line(self): 
+        self.ser = serial.Serial(port = '/dev/ttyUSB0', baudrate =  115200)
+        self.line = self.ser.readline().decode('utf-8').strip().split(',')
+        self.get_logger().info(f"Raw serial data: {self.line}")
+        self.line = [float(n) for n in self.line]
+    def send_IMU_data_cmd(self):
+        self.serial_line()
+        msg = Imu()
+        #msg.header.stamp = self.get_clock().now().to_msg()
+        #msg.header.frame_id = 'base_link' 
+        msg.linear_acceleration.x = self.line[0]
+        msg.linear_acceleration.y = self.line[1]
+        msg.linear_acceleration.z = self.line[2]
+
+        msg.angular_velocity.x = self.line[3]
+        msg.angular_velocity.y = self.line[4]
+        msg.angular_velocity.z = self.line[5]
+        self.IMU_pub_.publish(msg)
+        print("linear acceleration:",self.line[0:3]," m/s2")
+        print("langular velocity  :",self.line[3:6]," rad/s")
+        print("Tempreture         :",self.line[-1]," C")
+
+def main(args= None):
+    rclpy.init(args=args)
+    node = IMU_Publisher()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+ 
+if __name__ == '__main__':
+    main()
